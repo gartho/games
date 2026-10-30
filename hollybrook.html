@@ -33,7 +33,7 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--night);color:var
 .chipbtn kbd{font:700 11px var(--body);border:1px solid color-mix(in srgb,var(--gold) 60%,transparent);border-radius:4px;padding:1px 5px;color:var(--gold);}
 .chipbtn .dot{width:8px;height:8px;border-radius:50%;background:var(--pine);} .chipbtn.off .dot{background:var(--holly);}
 #soundPanel{padding:12px 14px;display:grid;grid-template-columns:auto 130px;gap:8px 12px;align-items:center;font-size:13px;}
-#soundPanel input{accent-color:var(--gold);width:130px;}
+#soundPanel input{accent-color:var(--gold);width:130px;} #unstuck{grid-column:1 / -1;justify-content:center;}
 #mapwrap{padding:6px;line-height:0;cursor:pointer;} #minimap{width:170px;height:170px;border-radius:50%;}
 #bigmap{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,12,30,.6);} #bigmap canvas{width:min(620px,92vmin);height:min(620px,92vmin);border-radius:50%;box-shadow:0 0 0 2px var(--gold),0 20px 60px rgba(0,0,0,.6);}
 #bigmap p{position:absolute;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;color:var(--muted);font-size:13px;}
@@ -115,10 +115,10 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--night);color:var
 </div>
 <div id="hud-tr">
   <div class="row">
-    <button id="soundBtn" class="panel chipbtn" type="button" aria-expanded="false">Sound</button>
+    <button id="soundBtn" class="panel chipbtn" type="button" aria-expanded="false">Options</button>
     <button id="cutBtn" class="panel chipbtn" type="button" title="Toggle the see-through walls"><span class="dot"></span>Cutaway <kbd>C</kbd></button>
   </div>
-  <div id="soundPanel" class="panel" hidden><label for="volMusic">Music</label><input id="volMusic" type="range" min="0" max="1" step="0.05"><label for="volSfx">Effects</label><input id="volSfx" type="range" min="0" max="1" step="0.05"></div>
+  <div id="soundPanel" class="panel" hidden><label for="volMusic">Music</label><input id="volMusic" type="range" min="0" max="1" step="0.05"><label for="volSfx">Effects</label><input id="volSfx" type="range" min="0" max="1" step="0.05"><button id="unstuck" type="button" class="chipbtn panel">Stuck? Return to the last fire</button></div>
   <div id="mapwrap" class="panel" title="Map (M)"><canvas id="minimap" width="340" height="340"></canvas></div>
 </div>
 <div id="bigmap" hidden><canvas id="bigcanvas" width="1000" height="1000"></canvas><p>The star marks where to go next. Press M or tap to close.</p></div>
@@ -679,7 +679,7 @@ const OUT = grp(); scene.add(OUT);
   for(let i=0;i<p.count;i++){ const x=p.getX(i), z=p.getZ(i), d=Math.hypot(x,z); const k=clamp((d-86)/14,0,1);
     p.setY(i, k*(1.2+Math.sin(x*0.21)*0.8+Math.cos(z*0.17+x*0.05)*0.9+Math.sin((x+z)*0.5)*0.25) - 0.02); }
   geo.computeVertexNormals(); const g=new THREE.Mesh(geo, M.snow); g.receiveShadow=true; OUT.add(g); })();
-let _pathN=0; const PATHS=[], TREE_SPOTS=[];
+let _pathN=0; const PATHS=[], TREE_SPOTS=[], PINE_RESERVE=[];
 function path(x,z,w,d,ry){ PATHS.push([x,z,w,d,ry||0]); const m=plane(w,d,mat(0xffffff,{map:rep(TX.cobble,w/2.4,d/2.4)}),x,0.006+(_pathN++)*0.0012,z,OUT); m.rotation.z=ry||0; return m; }
 // village square: a cobbled disc
 (function(){ const d=new THREE.Mesh(new THREE.CircleGeometry(8.2,40), mat(0xffffff,{map:rep(TX.cobble,7,7)})); d.rotation.x=-Math.PI/2; d.position.set(0,0.03,1); d.receiveShadow=true; OUT.add(d);
@@ -731,7 +731,7 @@ const TREE = {lights:[], star:null, starGlow:null, light:null, lit:false};
 /* ---------- pine trees (instanced, chunked so off-screen chunks are culled) ---------- */
 const PINE_GEO = { trunk:new THREE.CylinderGeometry(0.18,0.26,1,6), layers:[0,1,2].map(i=>new THREE.ConeGeometry(1.7-i*0.45,1.9,8)), caps:[0,1,2].map(i=>new THREE.ConeGeometry((1.7-i*0.45)*0.6,0.6,8)) };
 const groundY=(x,z)=>{ const d=Math.hypot(x,z); return d>86? clamp((d-86)/14,0,1)*1.2 : 0; };
-function plantPines(spots, colW){ spots.forEach(s=>{ if(Math.hypot(s[0],s[1])<88) TREE_SPOTS.push(s); });
+function plantPines(spots, colW){ spots=spots.filter(s=>!PINE_RESERVE.some(r=>Math.hypot(s[0]-r[0],s[1]-r[1])<(r[2]||3.6))); spots.forEach(s=>{ if(Math.hypot(s[0],s[1])<88) TREE_SPOTS.push(s); });
   const chunks=new Map(); spots.forEach(s=>{ const k=Math.floor(s[0]/40)+','+Math.floor(s[1]/40); if(!chunks.has(k)) chunks.set(k,[]); chunks.get(k).push(s); if(colW) addColC(s[0],s[1],colW*Math.min(1.2,s[2]),colW*Math.min(1.2,s[2]),[0]); });
   const dm=new THREE.Object3D();
   for(const list of chunks.values()){ let cx=0,cz=0; list.forEach(s=>{ cx+=s[0]; cz+=s[1]; }); cx/=list.length; cz/=list.length; let rad=0; list.forEach(s=>{ rad=Math.max(rad,Math.hypot(s[0]-cx,s[1]-cz)); });
@@ -1273,6 +1273,7 @@ function nearTrail(x,z,trail,w){ for(let i=0;i<trail.length-1;i++) if(segDist(x,
 function trailPath(trail,w){ for(let i=0;i<trail.length-1;i++){ const [ax,az]=trail[i], [bx,bz]=trail[i+1], l=Math.hypot(bx-ax,bz-az); path((ax+bx)/2,(az+bz)/2,l+w*0.6,w,Math.atan2(-(bz-az),bx-ax)); } }
 
 /* ---------- Frostmere Woods (north) ---------- */
+PINE_RESERVE.push([-5.2,-43,4.2],[12.5,-63,4.2]);
 const WOODS = { trail:[[-7.5,-38],[-9,-46],[-14,-52],[-22,-56],[-24,-60]], trail2:[[-22,-58],[-16,-64],[-8,-63],[2,-60],[8,-62]], spur:[[2,-60],[12,-55],[22,-52]],
   crater:{x:-24,z:-61,r:7}, oak:{x:8,z:-71,r:10}, glade:{x:22,z:-52,r:5} };
 (function(){ trailPath(WOODS.trail,2.2); trailPath(WOODS.trail2,2.2); trailPath(WOODS.spur,1.8);
@@ -1308,7 +1309,7 @@ const WOODS = { trail:[[-7.5,-38],[-9,-46],[-14,-52],[-22,-56],[-24,-60]], trail
   const gl=WOODS.glade; for(let i=0;i<7;i++){ const a2=i/7*TAU; const m=grp(gl.x+Math.cos(a2)*2.6,0,gl.z+Math.sin(a2)*2.6,RG); cyl(0.04,0.06,0.3,M.cream,0,0.15,0,m,6); const cap=sph(0.22,mat(0xc0392b),0,0.32,0,m,8,6); cap.scale.y=0.5; }
   digSpot(gl.x,gl.z+1,'ginger');
   // hushlings
-  [[-9,-48,'trail'],[-17,-54,'trail'],[-3,-62,'trail'],[c.x-2,c.z-3,'crater'],[c.x+3,c.z+2,'crater'],[c.x-3,c.z+3,'crater'],[c.x+1,c.z-4,'crater'],[14,-56,'trail'],[o.x-6,o.z+2,'oak']].forEach(q=>PZ.hushSpawns.push({x:q[0],z:q[1],tag:q[2],region:'woods'}));
+  [[-9,-48,'trail'],[-17,-54,'trail'],[c.x-2,c.z-3,'crater'],[c.x+3,c.z+2,'crater'],[c.x-3,c.z+3,'crater'],[c.x+1,c.z-4,'crater'],[14,-56,'trail'],[o.x-6,o.z+2,'oak']].forEach(q=>PZ.hushSpawns.push({x:q[0],z:q[1],tag:q[2],region:'woods'}));
 })();
 
 /* ---------- Mirrormere (east) ---------- */
@@ -1570,16 +1571,25 @@ function updateHush(dt){ const p=player.pos;
     let sp=0, tx=0, tz=0;
     if(h.frozen>0){ h.frozen-=dt; }
     else if(h.stun>0){ h.stun-=dt; }
-    else if(sees && d<9.5){ tx=dx/d; tz=dz/d; sp=2.35; }
-    else { if(Math.hypot(h.wander.x-h.pos.x,h.wander.z-h.pos.z)<0.5 || rand()<0.004){ const a=R(0,TAU), r=R(0,4); h.wander.x=h.home.x+Math.cos(a)*r; h.wander.z=h.home.z+Math.sin(a)*r; }
-      const wx=h.wander.x-h.pos.x, wz=h.wander.z-h.pos.z, wl=Math.hypot(wx,wz)||1; tx=wx/wl; tz=wz/wl; sp=0.9; }
+    else {
+      const fromHome=Math.hypot(h.pos.x-h.home.x,h.pos.z-h.home.z), nearFire=PZ.braziers.some(b=>b.lit && b.level===h.level && Math.hypot(b.x-p.x,b.z-p.z)<5);
+      if(h.cool>0) h.cool-=dt;
+      if(h.ret && fromHome<1.5) h.ret=false;
+      const canSee=!h.ret && sees && !nearFire && h.cool<=0 && d<6.5 && Math.hypot(p.x-h.home.x,p.z-h.home.z)<12; h.notice=canSee? Math.min(1,(h.notice||0)+dt) : Math.max(0,(h.notice||0)-dt*0.5);
+      if(canSee && h.notice>0.7){ h.chaseT=(h.chaseT||0)+dt; if(h.chaseT>7){ h.ret=true; h.chaseT=0; h.cool=5; } }
+      else h.chaseT=0;
+      if(h.chaseT>0){ tx=dx/d; tz=dz/d; sp=2.0; }
+      else if(h.cool>0 && sees && d<4){ tx=-dx/d; tz=-dz/d; sp=1.4; }   // backing off after a hit
+      else if(h.ret || fromHome>12){ h.ret=true; const hx=h.home.x-h.pos.x, hz=h.home.z-h.pos.z, hl=Math.hypot(hx,hz)||1; tx=hx/hl; tz=hz/hl; sp=1.8; }
+      else { if(Math.hypot(h.wander.x-h.pos.x,h.wander.z-h.pos.z)<0.5 || rand()<0.004){ const a=R(0,TAU), r=R(0,4); h.wander.x=h.home.x+Math.cos(a)*r; h.wander.z=h.home.z+Math.sin(a)*r; }
+      const wx=h.wander.x-h.pos.x, wz=h.wander.z-h.pos.z, wl=Math.hypot(wx,wz)||1; tx=wx/wl; tz=wz/wl; sp=0.9; } }
     const k=Math.exp(-dt*4); h.vx*=k; h.vz*=k;
     h.pos.x+=(tx*sp+h.vx)*dt; h.pos.z+=(tz*sp+h.vz)*dt; collide(h.pos,0.38,h.level);
-    if(sees && d<0.78 && h.frozen<=0 && h.stun<=0 && PS.hurtT<=0) hurtPlayer(dx,dz);
+    if(sees && d<0.78 && h.frozen<=0 && h.stun<=0 && PS.hurtT<=0 && !(h.cool>0)){ hurtPlayer(dx,dz); h.cool=4; h.chaseT=0; h.notice=0; }
     // looks
     h.wt+=dt; const by=h.level*H+0.65+Math.sin(h.wt*2.2+h.ph)*0.12; h.g.position.set(h.pos.x,by,h.pos.z); if(sp>0) h.g.rotation.y=angLerp(h.g.rotation.y,Math.atan2(tx,tz),dt*6);
     const fz=h.frozen>0, st=h.stun>0; h.body.material.color.set(fz?0x8fd0ff: h.flash>0?0xffffff:0x1b1f4a); h.body.material.emissive.set(fz?0x2a6fa0:0x140f3a); h.flash-=dt;
-    h.body.scale.set(1+Math.sin(h.wt*5)*0.04,1.1+Math.cos(h.wt*5)*0.05,1); h.eyes.forEach(e=>e.scale.y= st? 0.4 : 1.4*(Math.sin(h.wt*0.7+h.ph)>0.97?0.15:1));
+    h.body.scale.set(1+Math.sin(h.wt*5)*0.04,1.1+Math.cos(h.wt*5)*0.05,1); const wide=(h.notice||0)>0.15 && !(h.chaseT>0) ? 1.5 : 1; h.eyes.forEach(e=>{ e.scale.y= st? 0.4 : 1.4*wide*(Math.sin(h.wt*0.7+h.ph)>0.97?0.15:1); e.scale.x=wide; });
     h.halo.material.opacity = fz?0.1:0.45;
     let px=h.g.position.x, py=by, pz=h.g.position.z; h.tail.forEach((t,i)=>{ t.position.x+=(px-t.position.x)*Math.min(1,dt*(9-i*1.5)); t.position.y+=(py-0.1-i*0.06-t.position.y)*Math.min(1,dt*8); t.position.z+=(pz-t.position.z)*Math.min(1,dt*(9-i*1.5)); px=t.position.x; py=t.position.y; pz=t.position.z; t.visible=!fz;
       const vis = !h.building || (B[h.building].show!==false); t.visible=t.visible&&vis; });
@@ -1588,9 +1598,21 @@ function updateHush(dt){ const p=player.pos;
 function hurtPlayer(dx,dz){ PS.warmth-=1; PS.hurtT=1.4; const l=Math.hypot(dx,dz)||1; player.vel.x+=dx/l*7; player.vel.z+=dz/l*7; SFX.hurt(); hudFlash('hurt');
   SPARK.emit({x:player.pos.x,y:player.pos.y+1,z:player.pos.z,count:16,color:0x8fb4ff,speed:2,life:0.6,size:0.2});
   if(PS.warmth<=0) faint(); }
+function waterAt(x,z){ let w=false; nearCols(x,z,0.5,c=>{ if(c.water && !c.off && x>=c.x0 && x<=c.x1 && z>=c.z0 && z<=c.z1) w=true; }); return w; }
+function spotFree(x,z,lv){ return Math.hypot(x,z)<WORLD_R-1 && !solidAt(x,z,lv,0.42) && !waterAt(x,z) && !stairAt(x,z); }
+function openArea(x,z,lv,need){ const seen=new Set(), q=[[0,0]]; seen.add('0,0'); let n=0;
+  while(q.length && n<need){ const [i,j]=q.shift(); n++; for(const [a,b] of [[1,0],[-1,0],[0,1],[0,-1]]){ const ii=i+a, jj=j+b, k=ii+','+jj; if(seen.has(k) || Math.abs(ii)>18 || Math.abs(jj)>18) continue; seen.add(k); if(spotFree(x+ii*0.5,z+jj*0.5,lv)) q.push([ii,jj]); } }
+  return n; }
+// nearest spot with room to walk away from (never inside trees, water or furniture)
+function findSafeSpot(x,z,lv){ for(let r=0;r<=12;r+=0.5){ const n=r?Math.ceil(r*12):1; for(let i=0;i<n;i++){ const a=i/n*TAU, sx=x+Math.cos(a)*r, sz=z+Math.sin(a)*r;
+    if(spotFree(sx,sz,lv) && openArea(sx,sz,lv,220)>=220) return {x:sx,z:sz}; } } return {x,z}; }
+function respawnAt(c){ const s=findSafeSpot(c.x,c.z,c.level); c.x=s.x; c.z=s.z; player.pos.set(s.x,c.level*H,s.z); player.level=c.level; player.vel.set(0,0,0);
+  const m=findSafeSpot(s.x+0.9,s.z+0.7,c.level); margot.pos.set(m.x,c.level*H,m.z); margot.level=c.level; margot.runAhead=null; crumbs.length=0; cam.tgt.copy(player.pos); PS.hurtT=3;
+  for(const h of hush) if(h.alive && Math.hypot(h.pos.x-s.x,h.pos.z-s.z)<16){ h.pos.set(h.home.x,h.level*H,h.home.z); h.cool=4; h.ret=false; h.chaseT=0; } }
+function returnToFire(){ if(!started || PS.faint>0 || finale) return; PS.faint=1.6; $('fade').classList.add('on'); if(dlg){ dlg=null; $('dialog').hidden=true; }
+  setTimeout(()=>respawnAt(PS.cp),700); setTimeout(()=>$('fade').classList.remove('on'),1100); }
 function faint(){ if(PS.faint>0) return; PS.faint=2.6; $('fade').classList.add('on'); toast('Too cold! Isabelle hurries back to the last warm fire.');
-  setTimeout(()=>{ const c=PS.cp; player.pos.set(c.x,c.level*H,c.z); player.level=c.level; player.vel.set(0,0,0); margot.pos.set(c.x+0.9,c.level*H,c.z+0.7); margot.level=c.level; crumbs.length=0;
-    PS.warmth=PS.maxW; PS.hum=PS.maxHum; for(const h of hush) if(h.alive){ h.pos.set(h.home.x,h.level*H,h.home.z); } cam.tgt.copy(player.pos); if(WARDEN.active && !WARDEN.dead) WARDEN.pos.set(HILL.arena.x,0,HILL.arena.z-3); },1100);
+  setTimeout(()=>{ respawnAt(PS.cp); PS.warmth=PS.maxW; PS.hum=PS.maxHum; for(const h of hush) if(h.alive){ h.pos.set(h.home.x,h.level*H,h.home.z); } if(WARDEN.active && !WARDEN.dead) WARDEN.pos.set(HILL.arena.x,0,HILL.arena.z-3); },1100);
   setTimeout(()=>$('fade').classList.remove('on'),1700); }
 
 /* ---------- the Hush Warden ---------- */
@@ -1654,7 +1676,7 @@ function updatePuzzles(dt){ const p=player.pos;
   for(const g of PZ.gates){ if(g.open && g.y<2.6){ g.y=Math.min(2.6,g.y+dt*1.6); g.bars.position.y=g.y; } }
   for(const l of PZ.lanterns) if(l.lit) l.gl.material.opacity=0.7+0.15*Math.sin(T*7+l.x);
   for(const b of PZ.braziers){ if(!b.lit) continue; b.fl.forEach((c,i)=>{ c.scale.y=0.75+0.4*Math.abs(Math.sin(T*7+i*1.7)); }); b.gl.material.opacity=0.6+0.2*Math.sin(T*9+b.x);
-    if(b.level===player.level && Math.hypot(b.x-p.x,b.z-p.z)<2.8){ if(PS.cp.name!==b.name){ PS.cp={x:b.x+1.6,z:b.z+0.8,level:b.level,name:b.name}; toast('A warm fire. You will return here if you get too cold.'); saveGame(); }
+    if(b.level===player.level && Math.hypot(b.x-p.x,b.z-p.z)<2.8){ if(PS.cp.name!==b.name){ const sp=findSafeSpot(b.x+1.6,b.z+0.8,b.level); PS.cp={x:sp.x,z:sp.z,level:b.level,name:b.name}; toast('A warm fire. You will return here if you get too cold.'); saveGame(); }
       PS.regenT+=dt; if(PS.regenT>0.9 && PS.warmth<PS.maxW){ PS.regenT=0; PS.warmth++; SPARK.emit({x:p.x,y:p.y+1.2,z:p.z,count:8,color:0xffb050,speed:1,life:0.6,size:0.2,up:0.8}); } PS.hum=Math.min(PS.maxHum,PS.hum+dt*12); } }
   for(const c of PZ.curtains){ c.m.material.uniforms.t.value=T; if(!c.open && (c.needs==='lumen'? PS.chimes.lumen : CH_ORDER.every(k=>PS.chimes[k]))){ c.open=true; c.col.off=true; SFX.cast('lumen'); onEvent('curtain',c); }
     if(c.open && c.fade>0){ c.fade=Math.max(0,c.fade-dt*0.6); c.m.material.uniforms.a.value=c.fade; if(c.fade<=0) c.m.visible=false; }
@@ -2031,6 +2053,7 @@ function hudBell(n){ const c=$('chapter'); c.querySelector('.eb').textContent='T
 /* ---------- sound panel ---------- */
 $('volMusic').value=AU.musicVol; $('volSfx').value=AU.sfxVol;
 $('soundBtn').addEventListener('click',()=>{ const p=$('soundPanel'); p.hidden=!p.hidden; $('soundBtn').setAttribute('aria-expanded',String(!p.hidden)); audioInit(); });
+$('unstuck').addEventListener('click',()=>{ $('soundPanel').hidden=true; $('soundBtn').setAttribute('aria-expanded','false'); returnToFire(); });
 $('volMusic').addEventListener('input',e=>{ AU.musicVol=+e.target.value; setVolumes(); }); $('volSfx').addEventListener('input',e=>{ AU.sfxVol=+e.target.value; setVolumes(); SFX.pickup(); });
 
 /* ---------- minimap ---------- */
@@ -2090,7 +2113,7 @@ function applySave(d){ Object.assign(S,d.S); Object.assign(PS.chimes,d.chimes); 
     [['oscar',-1.6],['henry',-0.5],['lottie',0.6]].forEach(([k,dx])=>placeNPC(FAMILY[k], B.belfry.x+dx-1.0, B.belfry.z+2.3, 1, B.belfry, Math.PI)); }
   if(S.swapped) swapGlasses(); if(S.clapper===2) BELFRY.clapper.visible=true; if(S.jarFree && AU.wind) AU.wind.gain.value=0.09;
   if(S.ch>=6){ S.ch=5; startFinale(true); }
-  const cp=PS.cp; player.pos.set(cp.x,cp.level*H,cp.z); player.level=cp.level; margot.pos.set(cp.x+0.9,cp.level*H,cp.z+0.7); margot.level=cp.level; cam.tgt.copy(player.pos); }
+  respawnAt(PS.cp); PS.hurtT=0; }
 /* ================= EFFECTS, FINALE, CAMERA, INPUT, LOOP ================= */
 // falling snow
 const SN=2600, snowPos=new Float32Array(SN*3), snowSpd=new Float32Array(SN);
